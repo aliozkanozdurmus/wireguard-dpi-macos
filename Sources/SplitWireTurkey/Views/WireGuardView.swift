@@ -16,7 +16,7 @@ struct WireGuardView: View {
                                 .fontWeight(.semibold)
                             Spacer()
                             Text(appState.wireGuardStatus)
-                                .foregroundColor(appState.isWireGuardConfigured ? .green : .orange)
+                                .foregroundColor(appState.isWireGuardActive ? .green : (appState.isWireGuardConfigured ? .orange : .secondary))
                         }
 
                         if appState.isWireGuardConfigured {
@@ -26,6 +26,14 @@ struct WireGuardView: View {
                                 Spacer()
                                 Text("wgcf.conf")
                                     .foregroundColor(.secondary)
+                            }
+
+                            HStack {
+                                Text("Tünel:")
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text(appState.isWireGuardActive ? "Çalışıyor" : "Çalışmıyor")
+                                    .foregroundColor(appState.isWireGuardActive ? .green : .red)
                             }
                         }
                     }
@@ -59,7 +67,7 @@ struct WireGuardView: View {
                             }) {
                                 HStack {
                                     Image(systemName: "arrow.down.circle.fill")
-                                    Text("Standart Kurulum Yap")
+                                    Text(appState.isWireGuardConfigured ? "Kurulumu Onar / Yeniden Başlat" : "Standart Kurulum Yap")
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -156,11 +164,11 @@ struct WireGuardView: View {
                 // Information
                 GroupBox(label: Label("Bilgi", systemImage: "info.circle")) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Bu bölümdeki kurulumlar yalnızca Discord uygulaması için çalışır. Tarayıcı tünellemesi aktifse tarayıcılar da dahil edilir.")
+                        Text("WireGuard aktifken trafik sistem seviyesinde tünellenir; Discord ve tarayıcı bağlantıları uygulamanın açık kalmasına ihtiyaç duymaz.")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
-                        Text("Sisteminizi yeniden başlattığınızda ilgili yöntem otomatik olarak çalışmaya başlar.")
+                        Text("Sisteminizi yeniden başlattığınızda servis otomatik olarak çalışmaya başlar. Durum 'Aktif' değilse kurulumu onarın.")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -181,6 +189,9 @@ struct WireGuardView: View {
                 }
                 showFolderPicker = false
             }
+        }
+        .task {
+            await appState.checkWireGuardStatus()
         }
     }
 }

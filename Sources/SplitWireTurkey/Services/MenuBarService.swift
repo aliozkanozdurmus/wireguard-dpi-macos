@@ -84,6 +84,7 @@ class MenuBarService: ObservableObject {
         task.standardError = pipe
         task.arguments = ["-c", command]
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.environment = Shell.environment
 
         try task.run()
         task.waitUntilExit()
@@ -261,13 +262,14 @@ class MenuBarService: ObservableObject {
     private func performStartByeDPI() async {
         do {
             let ciadpiPath = findCiadpiPath()
-            guard FileManager.default.fileExists(atPath: ciadpiPath) else {
-                await showAlert(title: "Hata", message: "ciadpi binary bulunamadı")
+            guard FileManager.default.isExecutableFile(atPath: ciadpiPath) else {
+                await showAlert(title: "Hata", message: "ciadpi binary bulunamadı veya çalıştırılabilir değil.\n\nAranan yollar:\n\(CiadpiLocator.searchDescription)")
                 return
             }
 
             let process = Process()
             process.executableURL = URL(fileURLWithPath: ciadpiPath)
+            process.environment = Shell.environment
 
             // Use current preset arguments
             let args = presets[currentPreset] ?? "-r 1+s"
@@ -345,26 +347,7 @@ class MenuBarService: ObservableObject {
     }
 
     private func findCiadpiPath() -> String {
-        // Check bundle resources
-        if let bundlePath = Bundle.main.resourcePath {
-            let resourcePath = "\(bundlePath)/bin/ciadpi"
-            if FileManager.default.fileExists(atPath: resourcePath) {
-                return resourcePath
-            }
-        }
-
-        // Check next to executable
-        if let execPath = Bundle.main.executablePath {
-            let execDir = (execPath as NSString).deletingLastPathComponent
-            let devPath = "\(execDir)/../../../byedpi/ciadpi"
-            if FileManager.default.fileExists(atPath: devPath) {
-                return devPath
-            }
-        }
-
-        // Fallback
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return "\(home)/Downloads/SplitWire-Turkey-macOS/byedpi/ciadpi"
+        CiadpiLocator.find() ?? ""
     }
 
     private func showAlert(title: String, message: String) async {

@@ -23,6 +23,8 @@ APP_BUNDLE="${APP_NAME}.app"
 CONTENTS="${APP_BUNDLE}/Contents"
 MACOS="${CONTENTS}/MacOS"
 RESOURCES="${CONTENTS}/Resources"
+RESOURCE_BUNDLE_NAME="SplitWire-Turkey-macOS_SplitWireTurkey.bundle"
+RESOURCE_BUNDLE=".build/release/${RESOURCE_BUNDLE_NAME}"
 
 mkdir -p "${MACOS}"
 mkdir -p "${RESOURCES}"
@@ -34,12 +36,29 @@ cp ".build/release/${APP_NAME}" "${MACOS}/"
 # Copy ByeDPI binary
 echo "📋 Copying ByeDPI binary..."
 mkdir -p "${RESOURCES}/bin"
-if [ -f "byedpi/ciadpi" ]; then
-    cp "byedpi/ciadpi" "${RESOURCES}/bin/"
+CIADPI_SOURCE=""
+if [ -f "Sources/SplitWireTurkey/Resources/bin/ciadpi" ]; then
+    CIADPI_SOURCE="Sources/SplitWireTurkey/Resources/bin/ciadpi"
+elif [ -f "${RESOURCE_BUNDLE}/ciadpi" ]; then
+    CIADPI_SOURCE="${RESOURCE_BUNDLE}/ciadpi"
+elif [ -f "byedpi/ciadpi" ]; then
+    CIADPI_SOURCE="byedpi/ciadpi"
+fi
+
+if [ -n "${CIADPI_SOURCE}" ]; then
+    cp "${CIADPI_SOURCE}" "${RESOURCES}/bin/ciadpi"
     chmod +x "${RESOURCES}/bin/ciadpi"
-    echo "  ✓ ByeDPI (ciadpi) copied"
+    echo "  ✓ ByeDPI (ciadpi) copied from ${CIADPI_SOURCE}"
 else
-    echo "  ⚠ Warning: byedpi/ciadpi not found, skipping..."
+    echo "  ⚠ Warning: ciadpi not found, ByeDPI will not run"
+fi
+
+# Copy SwiftPM resource bundle if it exists. This keeps SwiftPM resources
+# available when the executable is packaged manually as a .app bundle.
+if [ -d "${RESOURCE_BUNDLE}" ]; then
+    echo "📋 Copying SwiftPM resource bundle..."
+    cp -R "${RESOURCE_BUNDLE}" "${RESOURCES}/"
+    echo "  ✓ Resource bundle copied"
 fi
 
 # Copy App Icon
@@ -90,6 +109,12 @@ EOF
 
 # Create PkgInfo
 echo "APPL????" > "${CONTENTS}/PkgInfo"
+
+# Ad-hoc sign for local development so macOS treats the bundle consistently.
+if command -v codesign >/dev/null 2>&1; then
+    echo "🔏 Ad-hoc signing app bundle..."
+    codesign --force --deep --sign - "${APP_BUNDLE}" >/dev/null 2>&1 || echo "  ⚠ Warning: codesign failed, continuing..."
+fi
 
 echo "✅ Build complete!"
 echo "📱 Application bundle created: ${APP_BUNDLE}"

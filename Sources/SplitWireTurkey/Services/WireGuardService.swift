@@ -10,6 +10,20 @@ class WireGuardService: ObservableObject {
     private let configDir: URL
     private let wgcfPath: URL
 
+    private struct GitHubRelease: Decodable {
+        let assets: [Asset]
+
+        struct Asset: Decodable {
+            let name: String
+            let browserDownloadURL: String
+
+            enum CodingKeys: String, CodingKey {
+                case name
+                case browserDownloadURL = "browser_download_url"
+            }
+        }
+    }
+
     init() {
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         self.configDir = homeDir.appendingPathComponent(".config/wireguard")
@@ -78,26 +92,23 @@ class WireGuardService: ObservableObject {
         isProcessing = true
         statusMessage = "WireGuard kaldırılıyor..."
 
-        do {
-            // Stop and remove WireGuard tunnel
-            try await executeShellCommand("wg-quick down wgcf || true")
+        let wgQuickPath = Shell.firstExecutable(named: "wg-quick") ?? "/opt/homebrew/bin/wg-quick"
+        let bashPath = Shell.firstExecutable(named: "bash") ?? "/opt/homebrew/bin/bash"
+        _ = try? await executePrivilegedShellCommand("\(Shell.quote(bashPath)) \(Shell.quote(wgQuickPath)) down wgcf || true")
+        _ = try? await executePrivilegedShellCommand("launchctl bootout system /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || launchctl unload /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || true")
+        _ = try? await executePrivilegedShellCommand("rm -f /Library/LaunchDaemons/com.splitwire.wireguard.plist /etc/wireguard/wgcf.conf")
 
-            // Remove configuration files
-            let configPath = configDir.appendingPathComponent("wgcf.conf")
-            let accountPath = configDir.appendingPathComponent("wgcf-account.toml")
-            let profilePath = configDir.appendingPathComponent("wgcf-profile.conf")
+        // Remove configuration files
+        let configPath = configDir.appendingPathComponent("wgcf.conf")
+        let accountPath = configDir.appendingPathComponent("wgcf-account.toml")
+        let profilePath = configDir.appendingPathComponent("wgcf-profile.conf")
 
-            try? FileManager.default.removeItem(at: configPath)
-            try? FileManager.default.removeItem(at: accountPath)
-            try? FileManager.default.removeItem(at: profilePath)
+        try? FileManager.default.removeItem(at: configPath)
+        try? FileManager.default.removeItem(at: accountPath)
+        try? FileManager.default.removeItem(at: profilePath)
 
-            statusMessage = "WireGuard başarıyla kaldırıldı!"
-            await showAlert(title: "Başarılı", message: "WireGuard başarıyla kaldırıldı.")
-
-        } catch {
-            statusMessage = "Hata: \(error.localizedDescription)"
-            await showAlert(title: "Hata", message: "Kaldırma işlemi başarısız: \(error.localizedDescription)")
-        }
+        statusMessage = "WireGuard başarıyla kaldırıldı!"
+        await showAlert(title: "Başarılı", message: "WireGuard başarıyla kaldırıldı.")
 
         isProcessing = false
     }
@@ -105,24 +116,47 @@ class WireGuardService: ObservableObject {
     // MARK: - Private Methods
 
     private func downloadWgcf() async throws {
-        // Check if wgcf already exists
-        if FileManager.default.fileExists(atPath: wgcfPath.path) {
-            print("wgcf already exists at \(wgcfPath.path)")
+        if isValidWgcf(at: wgcfPath) {
+            print("valid wgcf already exists at \(wgcfPath.path)")
             return
         }
 
-        // Download wgcf for macOS
-        let downloadURL = "https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_2.2.20_darwin_amd64"
-        let url = URL(string: downloadURL)!
-
-        let (localURL, _) = try await URLSession.shared.download(from: url)
-
-        // Move to final location
         try? FileManager.default.removeItem(at: wgcfPath)
+
+        let downloadURL = try await latestWgcfDownloadURL()
+        let (localURL, response) = try await URLSession.shared.download(from: downloadURL)
+
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200..<300).contains(httpResponse.statusCode) {
+            throw NSError(
+                domain: "WireGuardService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "wgcf indirilemedi. HTTP \(httpResponse.statusCode)"]
+            )
+        }
+
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: localURL.path),
+              let fileSize = attributes[.size] as? NSNumber,
+              fileSize.intValue > 1_000_000 else {
+            throw NSError(
+                domain: "WireGuardService",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "İndirilen wgcf dosyası geçerli bir binary değil."]
+            )
+        }
+
         try FileManager.default.moveItem(at: localURL, to: wgcfPath)
 
-        // Make executable
-        try await executeShellCommand("chmod +x '\(wgcfPath.path)'")
+        try await executeShellCommand("chmod +x \(Shell.quote(wgcfPath.path))")
+
+        guard isValidWgcf(at: wgcfPath) else {
+            try? FileManager.default.removeItem(at: wgcfPath)
+            throw NSError(
+                domain: "WireGuardService",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "wgcf indirildi ancak çalıştırılabilir görünmüyor."]
+            )
+        }
     }
 
     private func registerAndGenerateProfile() async throws {
@@ -131,11 +165,11 @@ class WireGuardService: ObservableObject {
         try? FileManager.default.removeItem(at: accountPath)
 
         // Register
-        let registerCommand = "cd '\(configDir.path)' && '\(wgcfPath.path)' register --accept-tos"
+        let registerCommand = "cd \(Shell.quote(configDir.path)) && \(Shell.quote(wgcfPath.path)) register --accept-tos"
         try await executeShellCommand(registerCommand)
 
         // Generate profile
-        let generateCommand = "cd '\(configDir.path)' && '\(wgcfPath.path)' generate"
+        let generateCommand = "cd \(Shell.quote(configDir.path)) && \(Shell.quote(wgcfPath.path)) generate"
         try await executeShellCommand(generateCommand)
     }
 
@@ -186,14 +220,16 @@ class WireGuardService: ObservableObject {
 
     private func installTunnel() async throws {
         let configPath = configDir.appendingPathComponent("wgcf.conf")
+        _ = try requireExecutable(named: "wg")
+        let wgQuickPath = try requireExecutable(named: "wg-quick")
+        let bashPath = try requireExecutable(named: "bash")
+        let wireGuardGoPath = try requireExecutable(named: "wireguard-go")
 
-        // Copy to /etc/wireguard (requires sudo)
-        let copyCommand = "sudo mkdir -p /etc/wireguard && sudo cp '\(configPath.path)' /etc/wireguard/wgcf.conf"
-        try await executeShellCommand(copyCommand)
+        let wgQuickCommand = "\(Shell.quote(bashPath)) \(Shell.quote(wgQuickPath))"
 
-        // Start tunnel
-        let startCommand = "sudo wg-quick up wgcf"
-        try await executeShellCommand(startCommand)
+        try await executePrivilegedShellCommand(
+            "mkdir -p /etc/wireguard && cp \(Shell.quote(configPath.path)) /etc/wireguard/wgcf.conf && (\(wgQuickCommand) down wgcf 2>/dev/null || true) && \(wgQuickCommand) up wgcf"
+        )
 
         // Enable at startup (create LaunchDaemon)
         let plistContent = """
@@ -205,10 +241,18 @@ class WireGuardService: ObservableObject {
             <string>com.splitwire.wireguard</string>
             <key>ProgramArguments</key>
             <array>
-                <string>/usr/local/bin/wg-quick</string>
+                <string>\(bashPath)</string>
+                <string>\(wgQuickPath)</string>
                 <string>up</string>
                 <string>wgcf</string>
             </array>
+            <key>EnvironmentVariables</key>
+            <dict>
+                <key>PATH</key>
+                <string>\(Shell.defaultPath)</string>
+                <key>WG_QUICK_USERSPACE_IMPLEMENTATION</key>
+                <string>\(wireGuardGoPath)</string>
+            </dict>
             <key>RunAtLoad</key>
             <true/>
             <key>KeepAlive</key>
@@ -220,11 +264,70 @@ class WireGuardService: ObservableObject {
         let plistPath = "/tmp/com.splitwire.wireguard.plist"
         try plistContent.write(toFile: plistPath, atomically: true, encoding: .utf8)
 
-        let installPlistCommand = "sudo cp '\(plistPath)' /Library/LaunchDaemons/ && sudo launchctl load /Library/LaunchDaemons/com.splitwire.wireguard.plist"
-        try? await executeShellCommand(installPlistCommand)
+        try? await executePrivilegedShellCommand(
+            "launchctl bootout system /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || true; cp \(Shell.quote(plistPath)) /Library/LaunchDaemons/com.splitwire.wireguard.plist && chown root:wheel /Library/LaunchDaemons/com.splitwire.wireguard.plist && chmod 644 /Library/LaunchDaemons/com.splitwire.wireguard.plist && launchctl bootstrap system /Library/LaunchDaemons/com.splitwire.wireguard.plist"
+        )
     }
 
-    private func executeShellCommand(_ command: String) async throws {
+    private func latestWgcfDownloadURL() async throws -> URL {
+        let releaseURL = URL(string: "https://api.github.com/repos/ViRb3/wgcf/releases/latest")!
+        let (data, response) = try await URLSession.shared.data(from: releaseURL)
+
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200..<300).contains(httpResponse.statusCode) {
+            throw NSError(
+                domain: "WireGuardService",
+                code: httpResponse.statusCode,
+                userInfo: [NSLocalizedDescriptionKey: "wgcf son sürüm bilgisi alınamadı. HTTP \(httpResponse.statusCode)"]
+            )
+        }
+
+        let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+
+        #if arch(arm64)
+        let architecture = "arm64"
+        #else
+        let architecture = "amd64"
+        #endif
+
+        guard let asset = release.assets.first(where: {
+            $0.name.hasPrefix("wgcf_") && $0.name.hasSuffix("_darwin_\(architecture)")
+        }),
+        let url = URL(string: asset.browserDownloadURL) else {
+            throw NSError(
+                domain: "WireGuardService",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Bu Mac için uygun wgcf binary bulunamadı (darwin_\(architecture))."]
+            )
+        }
+
+        return url
+    }
+
+    private func isValidWgcf(at url: URL) -> Bool {
+        guard FileManager.default.isExecutableFile(atPath: url.path),
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let fileSize = attributes[.size] as? NSNumber else {
+            return false
+        }
+
+        return fileSize.intValue > 1_000_000
+    }
+
+    private func requireExecutable(named name: String) throws -> String {
+        if let path = Shell.firstExecutable(named: name) {
+            return path
+        }
+
+        throw NSError(
+            domain: "WireGuardService",
+            code: 5,
+            userInfo: [NSLocalizedDescriptionKey: "\(name) bulunamadı. Terminal'de `brew install wireguard-tools` çalıştırıp tekrar deneyin."]
+        )
+    }
+
+    @discardableResult
+    private func executeShellCommand(_ command: String) async throws -> String {
         let task = Process()
         let pipe = Pipe()
 
@@ -232,15 +335,44 @@ class WireGuardService: ObservableObject {
         task.standardError = pipe
         task.arguments = ["-c", command]
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.environment = Shell.environment
 
         try task.run()
         task.waitUntilExit()
 
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+
         if task.terminationStatus != 0 {
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw NSError(domain: "ShellCommand", code: Int(task.terminationStatus), userInfo: [NSLocalizedDescriptionKey: output])
         }
+
+        return output
+    }
+
+    private func executePrivilegedShellCommand(_ command: String) async throws {
+        let commandWithPath = "export PATH=\(Shell.quote(Shell.defaultPath)); \(command)"
+        let script = "do shell script \(appleScriptString(commandWithPath)) with administrator privileges"
+
+        var error: NSDictionary?
+        let appleScript = NSAppleScript(source: script)
+        appleScript?.executeAndReturnError(&error)
+
+        if let error = error {
+            throw NSError(
+                domain: "AppleScript",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: error.description]
+            )
+        }
+    }
+
+    private func appleScriptString(_ value: String) -> String {
+        let escaped = value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+
+        return "\"\(escaped)\""
     }
 
     private func showAlert(title: String, message: String) async {

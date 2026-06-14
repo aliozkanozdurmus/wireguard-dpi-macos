@@ -270,8 +270,8 @@ struct ByeDPIView: View {
                         .cornerRadius(6)
 
                         Button(action: {
-                            let settingsPath = "~/Library/Application Support/discord/settings.json"
-                            let command = "open -R '\(settingsPath)'"
+                            let settingsPath = NSHomeDirectory() + "/Library/Application Support/discord/settings.json"
+                            let command = "open -R \(Shell.quote(settingsPath))"
                             Task {
                                 try? await ByeDPIService().executeShellCommand(command)
                             }

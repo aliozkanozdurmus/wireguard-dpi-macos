@@ -10,6 +10,7 @@ class AppState: ObservableObject {
 
     // WireGuard State
     @Published var isWireGuardConfigured = false
+    @Published var isWireGuardActive = false
     @Published var wireGuardStatus = "Yapılandırılmadı"
 
     // Service States
@@ -119,12 +120,43 @@ class AppState: ObservableObject {
 
     @MainActor
     func checkWireGuardStatus() async {
-        // Check if WireGuard is configured
-        let configPath = FileManager.default.homeDirectoryForCurrentUser
+        let userConfigPath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/wireguard/wgcf.conf")
+        let systemConfigPath = "/etc/wireguard/wgcf.conf"
 
-        isWireGuardConfigured = FileManager.default.fileExists(atPath: configPath.path)
-        wireGuardStatus = isWireGuardConfigured ? "Yapılandırıldı" : "Yapılandırılmadı"
+        let hasConfig = FileManager.default.fileExists(atPath: userConfigPath.path)
+            || FileManager.default.fileExists(atPath: systemConfigPath)
+        let launchdStatus = (try? await executeShellCommand("launchctl print system/com.splitwire.wireguard 2>/dev/null")) ?? ""
+        let routeStatus = (try? await executeShellCommand("route -n get 1.1.1.1 2>/dev/null")) ?? ""
+
+        isWireGuardConfigured = hasConfig
+        isWireGuardActive = launchdStatus.contains("state = running")
+            || routeStatus.contains("interface: utun")
+
+        if isWireGuardActive {
+            wireGuardStatus = "Aktif"
+        } else if isWireGuardConfigured {
+            wireGuardStatus = "Kurulu ama çalışmıyor"
+        } else {
+            wireGuardStatus = "Yapılandırılmadı"
+        }
+    }
+
+    private func executeShellCommand(_ command: String) async throws -> String {
+        let task = Process()
+        let pipe = Pipe()
+
+        task.standardOutput = pipe
+        task.standardError = pipe
+        task.arguments = ["-c", command]
+        task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.environment = Shell.environment
+
+        try task.run()
+        task.waitUntilExit()
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        return String(data: data, encoding: .utf8) ?? ""
     }
 
     func addCustomFolder(_ folder: String) {

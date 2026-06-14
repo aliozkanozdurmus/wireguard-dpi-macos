@@ -29,39 +29,8 @@ class ByeDPIService: ObservableObject {
     @Published var customArgs = "-r 1+s"
 
     init() {
-        // Find ciadpi binary
-        // Priority:
-        // 1. Inside app bundle Resources
-        // 2. Next to executable (for development)
-        // 3. In byedpi directory (fallback)
-
-        if let bundlePath = Bundle.main.resourcePath {
-            let resourcePath = "\(bundlePath)/bin/ciadpi"
-            if FileManager.default.fileExists(atPath: resourcePath) {
-                self.ciadpiPath = resourcePath
-                print("ByeDPI found in bundle: \(resourcePath)")
-                return
-            }
-        }
-
-        // Try next to executable
-        if let execPath = Bundle.main.executablePath {
-            let execDir = (execPath as NSString).deletingLastPathComponent
-            let devPath = "\(execDir)/../../../byedpi/ciadpi"
-            if FileManager.default.fileExists(atPath: devPath) {
-                self.ciadpiPath = devPath
-                print("ByeDPI found in dev path: \(devPath)")
-                return
-            }
-        }
-
-        // Fallback to byedpi directory
-        let fallbackPath = FileManager.default.homeDirectoryForCurrentUser
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Downloads/SplitWire-Turkey-macOS/byedpi/ciadpi")
-        self.ciadpiPath = fallbackPath.path
-        print("ByeDPI fallback path: \(fallbackPath.path)")
+        self.ciadpiPath = CiadpiLocator.find() ?? ""
+        print("ByeDPI path: \(ciadpiPath.isEmpty ? "not found" : ciadpiPath)")
     }
 
     func start(preset: String? = nil, isRetry: Bool = false) async {
@@ -82,7 +51,7 @@ class ByeDPIService: ObservableObject {
 
             await showAlert(
                 title: "Başarılı",
-                message: "ByeDPI başarıyla başlatıldı.\n\nSOCKS5 Proxy: 127.0.0.1:1080\n\nDiscord'u başlatmak için:\n1. Terminal'den: open -a Discord --args --proxy-server=socks5://127.0.0.1:1080\n2. Veya sistem proxy ayarlarını yapılandırın."
+                message: "ByeDPI başarıyla başlatıldı.\n\nSOCKS5 Proxy: 127.0.0.1:1080\n\nDiscord'u proxy ile açmak için favorilerdeki Discord butonunu kullanın veya Terminal'den şu komutu çalıştırın:\nopen -na /Applications/Discord.app --args --proxy-server=socks5://127.0.0.1:1080 --disable-quic"
             )
 
         } catch let error as NSError {
@@ -250,7 +219,7 @@ class ByeDPIService: ObservableObject {
             } catch {
                 await showAlert(
                     title: "Uyarı",
-                    message: "ByeDPI başlatıldı ancak Discord açılamadı. Discord'u manuel olarak şu komutla başlatın:\n\nopen -a Discord --args --proxy-server=socks5://127.0.0.1:1080"
+                    message: "ByeDPI başlatıldı ancak Discord açılamadı. Discord'u manuel olarak şu komutla başlatın:\n\nopen -na /Applications/Discord.app --args --proxy-server=socks5://127.0.0.1:1080 --disable-quic"
                 )
             }
         }
@@ -360,7 +329,15 @@ class ByeDPIService: ObservableObject {
             throw NSError(
                 domain: "ByeDPIService",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "ciadpi binary bulunamadı: \(ciadpiPath)"]
+                userInfo: [NSLocalizedDescriptionKey: "ciadpi binary bulunamadı.\n\nAranan yollar:\n\(CiadpiLocator.searchDescription)"]
+            )
+        }
+
+        guard FileManager.default.isExecutableFile(atPath: ciadpiPath) else {
+            throw NSError(
+                domain: "ByeDPIService",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "ciadpi çalıştırılabilir değil: \(ciadpiPath)"]
             )
         }
 
@@ -376,6 +353,7 @@ class ByeDPIService: ObservableObject {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: ciadpiPath)
+        process.environment = Shell.environment
 
         // Parse arguments
         let argArray = args.split(separator: " ").map(String.init)
@@ -428,17 +406,17 @@ class ByeDPIService: ObservableObject {
             // Check if still running
             if !process.isRunning {
                 // Try to read any error output (non-blocking)
-                let errorData = try? errorPipe.fileHandleForReading.availableData
-                let outputData = try? outputPipe.fileHandleForReading.availableData
+                let errorData = errorPipe.fileHandleForReading.availableData
+                let outputData = outputPipe.fileHandleForReading.availableData
 
                 var errorMessage = "ByeDPI başlatılamadı (process durdu)"
 
-                if let errorData = errorData, !errorData.isEmpty,
+                if !errorData.isEmpty,
                    let errorOutput = String(data: errorData, encoding: .utf8), !errorOutput.isEmpty {
                     errorMessage += "\n\nHata çıktısı:\n\(errorOutput)"
                 }
 
-                if let outputData = outputData, !outputData.isEmpty,
+                if !outputData.isEmpty,
                    let stdOutput = String(data: outputData, encoding: .utf8), !stdOutput.isEmpty {
                     errorMessage += "\n\nÇıktı:\n\(stdOutput)"
                 }
@@ -468,17 +446,24 @@ class ByeDPIService: ObservableObject {
     }
 
     private func launchDiscordWithProxy() async throws {
-        let discordPath = "/Applications/Discord.app/Contents/MacOS/Discord"
+        let discordCandidates = [
+            (name: "Discord", bundlePath: "/Applications/Discord.app", processName: "Discord"),
+            (name: "Discord PTB", bundlePath: "/Applications/Discord PTB.app", processName: "Discord PTB"),
+            (name: "Discord Canary", bundlePath: "/Applications/Discord Canary.app", processName: "Discord Canary")
+        ]
 
-        guard FileManager.default.fileExists(atPath: discordPath) else {
+        guard let discord = discordCandidates.first(where: { FileManager.default.fileExists(atPath: $0.bundlePath) }) else {
             throw NSError(
                 domain: "ByeDPIService",
                 code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Discord bulunamadı"]
+                userInfo: [NSLocalizedDescriptionKey: "Discord bulunamadı. /Applications altında Discord.app, Discord PTB.app veya Discord Canary.app bekleniyor."]
             )
         }
 
-        let command = "open -a '\(discordPath)' --args --proxy-server=socks5://127.0.0.1:1080 --ignore-certificate-errors"
+        _ = try? await executeShellCommand("pkill -x \(Shell.quote(discord.processName)) 2>/dev/null || true")
+        try? await Task.sleep(nanoseconds: 800_000_000)
+
+        let command = "open -na \(Shell.quote(discord.bundlePath)) --args --proxy-server=socks5://127.0.0.1:1080 --disable-quic"
         _ = try await executeShellCommand(command)
     }
 
@@ -495,11 +480,16 @@ class ByeDPIService: ObservableObject {
         if appPath.hasSuffix(".app") {
             // Use custom args if provided, otherwise use default proxy args
             let args = customArgs ?? "--proxy-server=socks5://127.0.0.1:1080"
-            let command = "open -a '\(appPath)' --args \(args)"
+            if appPath.localizedCaseInsensitiveContains("Discord") {
+                try await launchDiscordWithProxy()
+                return
+            }
+
+            let command = "open -na \(Shell.quote(appPath)) --args \(args)"
             _ = try await executeShellCommand(command)
         } else {
             // For executables, just open
-            let command = "open '\(appPath)'"
+            let command = "open \(Shell.quote(appPath))"
             _ = try await executeShellCommand(command)
         }
     }
@@ -527,6 +517,7 @@ class ByeDPIService: ObservableObject {
         task.standardError = pipe
         task.arguments = ["-c", command]
         task.executableURL = URL(fileURLWithPath: "/bin/bash")
+        task.environment = Shell.environment
 
         try task.run()
         task.waitUntilExit()
@@ -566,14 +557,14 @@ class ByeDPIService: ObservableObject {
         alert.alertStyle = title == "Hata" || title == "Uyarı" ? .warning : .informational
         alert.addButton(withTitle: "Tamam")
 
-        if message.contains("open -a Discord") {
+        if message.contains("open -na /Applications/Discord.app") {
             alert.addButton(withTitle: "Kopyala")
             let response = alert.runModal()
             if response == .alertSecondButtonReturn {
                 // Copy command to clipboard
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
-                pasteboard.setString("open -a Discord --args --proxy-server=socks5://127.0.0.1:1080", forType: .string)
+                pasteboard.setString("open -na /Applications/Discord.app --args --proxy-server=socks5://127.0.0.1:1080 --disable-quic", forType: .string)
             }
         } else {
             alert.runModal()
