@@ -17,7 +17,7 @@ xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 
-# App bundle (we'll provide release builds separately)
+# App bundles are ignored by default; release bundles are force-added when needed.
 *.app/
 
 # macOS

@@ -4,21 +4,21 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:SplitWire-Turkey-macOS}",
-            "name": "Debug SplitWire-Turkey",
-            "target": "SplitWire-Turkey",
+            "cwd": "${workspaceFolder}",
+            "name": "Debug wireguard-dpi-macos",
+            "target": "wireguard-dpi-macos",
             "configuration": "debug",
-            "preLaunchTask": "swift: Build Debug SplitWire-Turkey"
+            "preLaunchTask": "swift: Build Debug wireguard-dpi-macos"
         },
         {
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:SplitWire-Turkey-macOS}",
-            "name": "Release SplitWire-Turkey",
-            "target": "SplitWire-Turkey",
+            "cwd": "${workspaceFolder}",
+            "name": "Release wireguard-dpi-macos",
+            "target": "wireguard-dpi-macos",
             "configuration": "release",
-            "preLaunchTask": "swift: Build Release SplitWire-Turkey"
+            "preLaunchTask": "swift: Build Release wireguard-dpi-macos"
         }
     ]
 }

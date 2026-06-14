@@ -126,7 +126,9 @@ class AppState: ObservableObject {
 
         let hasConfig = FileManager.default.fileExists(atPath: userConfigPath.path)
             || FileManager.default.fileExists(atPath: systemConfigPath)
-        let launchdStatus = (try? await executeShellCommand("launchctl print system/com.splitwire.wireguard 2>/dev/null")) ?? ""
+            || FileManager.default.fileExists(atPath: WireGuardLaunchDaemon.plistPath)
+            || FileManager.default.fileExists(atPath: WireGuardLaunchDaemon.legacyPlistPath)
+        let launchdStatus = await launchDaemonStatus()
         let routeStatus = (try? await executeShellCommand("route -n get 1.1.1.1 2>/dev/null")) ?? ""
 
         isWireGuardConfigured = hasConfig
@@ -157,6 +159,16 @@ class AppState: ObservableObject {
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         return String(data: data, encoding: .utf8) ?? ""
+    }
+
+    private func launchDaemonStatus() async -> String {
+        var output = ""
+
+        for label in WireGuardLaunchDaemon.allLabels {
+            output += (try? await executeShellCommand("launchctl print system/\(label) 2>/dev/null")) ?? ""
+        }
+
+        return output
     }
 
     func addCustomFolder(_ folder: String) {

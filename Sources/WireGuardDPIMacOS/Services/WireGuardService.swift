@@ -95,8 +95,8 @@ class WireGuardService: ObservableObject {
         let wgQuickPath = Shell.firstExecutable(named: "wg-quick") ?? "/opt/homebrew/bin/wg-quick"
         let bashPath = Shell.firstExecutable(named: "bash") ?? "/opt/homebrew/bin/bash"
         _ = try? await executePrivilegedShellCommand("\(Shell.quote(bashPath)) \(Shell.quote(wgQuickPath)) down wgcf || true")
-        _ = try? await executePrivilegedShellCommand("launchctl bootout system /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || launchctl unload /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || true")
-        _ = try? await executePrivilegedShellCommand("rm -f /Library/LaunchDaemons/com.splitwire.wireguard.plist /etc/wireguard/wgcf.conf")
+        _ = try? await executePrivilegedShellCommand(launchDaemonBootoutCommand())
+        _ = try? await executePrivilegedShellCommand("rm -f \(Shell.quote(WireGuardLaunchDaemon.plistPath)) \(Shell.quote(WireGuardLaunchDaemon.legacyPlistPath)) /etc/wireguard/wgcf.conf")
 
         // Remove configuration files
         let configPath = configDir.appendingPathComponent("wgcf.conf")
@@ -238,7 +238,7 @@ class WireGuardService: ObservableObject {
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>com.splitwire.wireguard</string>
+            <string>\(WireGuardLaunchDaemon.label)</string>
             <key>ProgramArguments</key>
             <array>
                 <string>\(bashPath)</string>
@@ -261,12 +261,20 @@ class WireGuardService: ObservableObject {
         </plist>
         """
 
-        let plistPath = "/tmp/com.splitwire.wireguard.plist"
+        let plistPath = "/tmp/\(WireGuardLaunchDaemon.label).plist"
         try plistContent.write(toFile: plistPath, atomically: true, encoding: .utf8)
 
         try? await executePrivilegedShellCommand(
-            "launchctl bootout system /Library/LaunchDaemons/com.splitwire.wireguard.plist 2>/dev/null || true; cp \(Shell.quote(plistPath)) /Library/LaunchDaemons/com.splitwire.wireguard.plist && chown root:wheel /Library/LaunchDaemons/com.splitwire.wireguard.plist && chmod 644 /Library/LaunchDaemons/com.splitwire.wireguard.plist && launchctl bootstrap system /Library/LaunchDaemons/com.splitwire.wireguard.plist"
+            "\(launchDaemonBootoutCommand()); rm -f \(Shell.quote(WireGuardLaunchDaemon.legacyPlistPath)); cp \(Shell.quote(plistPath)) \(Shell.quote(WireGuardLaunchDaemon.plistPath)) && chown root:wheel \(Shell.quote(WireGuardLaunchDaemon.plistPath)) && chmod 644 \(Shell.quote(WireGuardLaunchDaemon.plistPath)) && launchctl bootstrap system \(Shell.quote(WireGuardLaunchDaemon.plistPath))"
         )
+    }
+
+    private func launchDaemonBootoutCommand() -> String {
+        zip(WireGuardLaunchDaemon.allLabels, WireGuardLaunchDaemon.allPlistPaths)
+            .map { label, plistPath in
+                "launchctl bootout system/\(label) 2>/dev/null || launchctl bootout system \(Shell.quote(plistPath)) 2>/dev/null || launchctl unload \(Shell.quote(plistPath)) 2>/dev/null || true"
+            }
+            .joined(separator: "; ")
     }
 
     private func latestWgcfDownloadURL() async throws -> URL {

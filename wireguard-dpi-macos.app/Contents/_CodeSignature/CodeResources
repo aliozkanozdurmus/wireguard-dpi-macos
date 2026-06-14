@@ -8,11 +8,11 @@
 		<data>
 		kzxnbsKyKB0smKGED9PU9J3aRPk=
 		</data>
-		<key>Resources/SplitWire-Turkey-macOS_SplitWireTurkey.bundle/ciadpi</key>
+		<key>Resources/bin/ciadpi</key>
 		<data>
 		QNteTtqGWosVpKbp/Chinmk6G64=
 		</data>
-		<key>Resources/bin/ciadpi</key>
+		<key>Resources/wireguard-dpi-macos_WireGuardDPIMacOS.bundle/ciadpi</key>
 		<data>
 		QNteTtqGWosVpKbp/Chinmk6G64=
 		</data>
@@ -26,14 +26,14 @@
 			q6yskk3HhwspRTH0B12l0TNoMeVlpLfLQ/IJLuyGzFU=
 			</data>
 		</dict>
-		<key>Resources/SplitWire-Turkey-macOS_SplitWireTurkey.bundle/ciadpi</key>
+		<key>Resources/bin/ciadpi</key>
 		<dict>
 			<key>hash2</key>
 			<data>
 			j+ww39finwopfDkDdU3gqApXvxFAXTnEVuGsHnidgHw=
 			</data>
 		</dict>
-		<key>Resources/bin/ciadpi</key>
+		<key>Resources/wireguard-dpi-macos_WireGuardDPIMacOS.bundle/ciadpi</key>
 		<dict>
 			<key>hash2</key>
 			<data>

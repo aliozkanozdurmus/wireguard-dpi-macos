@@ -5,13 +5,13 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>SplitWire-Turkey</string>
+    <string>wireguard-dpi-macos</string>
     <key>CFBundleIdentifier</key>
-    <string>com.cagritaskn.splitwire-turkey</string>
+    <string>com.aliozkanozdurmus.wireguard-dpi-macos</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>SplitWire-Turkey</string>
+    <string>wireguard-dpi-macos</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -20,6 +20,8 @@
     <string>1</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
+    <key>CFBundleDisplayName</key>
+    <string>wireguard-dpi-macos</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>
@@ -27,6 +29,6 @@
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2025 Çağrı Taşkın. All rights reserved.</string>
+    <string>Copyright © 2026 wireguard-dpi-macos contributors.</string>
 </dict>
 </plist>

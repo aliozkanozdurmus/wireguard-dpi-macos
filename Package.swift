@@ -2,22 +2,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "SplitWire-Turkey-macOS",
+    name: "wireguard-dpi-macos",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .executable(
-            name: "SplitWire-Turkey",
-            targets: ["SplitWireTurkey"]
+            name: "wireguard-dpi-macos",
+            targets: ["WireGuardDPIMacOS"]
         )
     ],
     dependencies: [],
     targets: [
         .executableTarget(
-            name: "SplitWireTurkey",
+            name: "WireGuardDPIMacOS",
             dependencies: [],
-            path: "Sources/SplitWireTurkey",
+            path: "Sources/WireGuardDPIMacOS",
             resources: [
                 .process("Resources")
             ]

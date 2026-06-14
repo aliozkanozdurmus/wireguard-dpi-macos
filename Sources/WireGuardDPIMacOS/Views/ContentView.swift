@@ -50,7 +50,7 @@ struct HeaderView: View {
         HStack {
             // Logo and Title
             VStack(alignment: .leading, spacing: 4) {
-                Text("SplitWire-Turkey")
+                Text("wireguard-dpi-macos")
                     .font(.title)
                     .fontWeight(.bold)
                 Text("macOS Edition")

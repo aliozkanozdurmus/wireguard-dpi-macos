@@ -11,7 +11,7 @@ struct AboutView: View {
                         .frame(width: 100, height: 100)
                         .foregroundColor(.accentColor)
 
-                    Text("SplitWire-Turkey")
+                    Text("wireguard-dpi-macos")
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
@@ -26,10 +26,10 @@ struct AboutView: View {
                 // Description
                 GroupBox(label: Label("Hakkında", systemImage: "info.circle.fill")) {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("SplitWire-Turkey, Türkiye'deki internet kullanıcıları için özel olarak tasarlanmış bir DPI aşımı ve tünelleme uygulamasıdır.")
+                        Text("wireguard-dpi-macos, macOS üzerinde WireGuard ve ByeDPI akışlarını tek yerden yöneten bağımsız bir ağ aracıdır.")
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Text("Bu macOS versiyonu, orijinal Windows uygulamasının temel özelliklerini macOS platformuna taşır.")
+                        Text("Ana kullanım senaryosu Discord ve erişim sorunu yaşanan servisler için kalıcı WireGuard/WARP tüneli kurmaktır.")
                             .fixedSize(horizontal: false, vertical: true)
                             .foregroundColor(.secondary)
                     }
@@ -48,65 +48,8 @@ struct AboutView: View {
                     .padding()
                 }
 
-                // Credits
                 GroupBox(label: Label("Teşekkürler", systemImage: "heart.fill")) {
                     VStack(alignment: .leading, spacing: 12) {
-                        // Original Developer
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Orijinal Windows uygulaması:")
-                                .fontWeight(.semibold)
-                            Text("Çağrı Taşkın")
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        // macOS Port Developer
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("macOS Portu:")
-                                .fontWeight(.semibold)
-
-                            HStack(spacing: 12) {
-                                // GitHub Avatar style icon
-                                ZStack {
-                                    Circle()
-                                        .fill(LinearGradient(
-                                            colors: [.blue, .purple],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ))
-                                        .frame(width: 40, height: 40)
-
-                                    Image(systemName: "person.circle.fill")
-                                        .font(.system(size: 32))
-                                        .foregroundColor(.white)
-                                }
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Mert Dinçer")
-                                        .fontWeight(.medium)
-
-                                    Button(action: {
-                                        if let url = URL(string: "https://github.com/a-mertdincer") {
-                                            NSWorkspace.shared.open(url)
-                                        }
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "link")
-                                                .font(.caption)
-                                            Text("@a-mertdincer")
-                                                .font(.caption)
-                                        }
-                                        .foregroundColor(.blue)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-
-                        Divider()
-
                         Text("Kullanılan Araçlar:")
                             .fontWeight(.semibold)
                         VStack(alignment: .leading, spacing: 4) {
@@ -125,7 +68,7 @@ struct AboutView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("MIT License")
                             .fontWeight(.semibold)
-                        Text("Copyright © 2025 Çağrı Taşkın")
+                        Text("Copyright © 2026 wireguard-dpi-macos contributors")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -135,13 +78,13 @@ struct AboutView: View {
                 // Links
                 VStack(spacing: 8) {
                     Button(action: {
-                        if let url = URL(string: "https://github.com/cagritaskn/SplitWire-Turkey") {
+                        if let url = URL(string: "https://github.com/aliozkanozdurmus/wireguard-dpi-macos") {
                             NSWorkspace.shared.open(url)
                         }
                     }) {
                         HStack {
                             Image(systemName: "link.circle.fill")
-                            Text("GitHub Sayfası (Orijinal Proje)")
+                            Text("GitHub Sayfası")
                         }
                         .frame(maxWidth: .infinity)
                     }

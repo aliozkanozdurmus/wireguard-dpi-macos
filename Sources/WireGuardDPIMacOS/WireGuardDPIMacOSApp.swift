@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct SplitWireTurkeyApp: App {
+struct WireGuardDPIMacOSApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var menuBarService = MenuBarService()
@@ -19,13 +19,13 @@ struct SplitWireTurkeyApp: App {
         .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(replacing: .appInfo) {
-                Button("SplitWire-Turkey Hakkında") {
+                Button("wireguard-dpi-macos Hakkında") {
                     NSApplication.shared.orderFrontStandardAboutPanel(
                         options: [
-                            NSApplication.AboutPanelOptionKey.applicationName: "SplitWire-Turkey",
+                            NSApplication.AboutPanelOptionKey.applicationName: "wireguard-dpi-macos",
                             NSApplication.AboutPanelOptionKey.applicationVersion: "1.0",
                             NSApplication.AboutPanelOptionKey.version: "macOS Edition",
-                            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "© 2025 Çağrı Taşkın"
+                            NSApplication.AboutPanelOptionKey(rawValue: "Copyright"): "© 2026 wireguard-dpi-macos contributors"
                         ]
                     )
                 }
